@@ -1,9 +1,9 @@
 import os
 import cv2
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 import skimage.measure
+import re
 
 # miscellaneous function for reading, writing and processing rgb and depth images.
 
@@ -206,7 +206,9 @@ class ImageDataset:
         self.dataset_dir = root_dir
         self.subsetname = subsetname
         self.rgb_image_dir = root_dir
-        self.files = sorted(os.listdir(self.rgb_image_dir))
+
+        self.files = sorted([f for f in os.listdir(self.rgb_image_dir) if
+                             re.match(r".*\.jpg", f) or re.match(r".*\.png", f)])
 
     def __len__(self):
         return len(self.files)

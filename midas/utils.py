@@ -195,7 +195,7 @@ def write_depth(path, depth, bits=1 , colored=False):
     if bits == 1 or colored:
         out = out.astype("uint8")
         if colored:
-            out = cv2.applyColorMap(out,cv2.COLORMAP_INFERNO)
+            out = cv2.applyColorMap(out,cv2.COLORMAP_SUMMER)
         cv2.imwrite(path+'.png', out)
     elif bits == 2:
         cv2.imwrite(path+'.png', out.astype("uint16"))

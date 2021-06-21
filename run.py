@@ -3,7 +3,7 @@ from torchvision.transforms import Compose
 from torchvision.transforms import transforms
 
 # OUR
-from utils import ImageandPatchs, ImageDataset, generatemask, getGF_fromintegral, calculateprocessingres, rgb2gray,\
+from utils import ImageandPatchs, ImageDataset, generatemask, getGF_fromintegral, calculateprocessingres, rgb2gray, \
     applyGridpatch
 
 # MIDAS
@@ -22,6 +22,7 @@ import cv2
 import numpy as np
 import argparse
 import warnings
+
 warnings.simplefilter('ignore', np.RankWarning)
 
 # select device
@@ -34,11 +35,11 @@ midasmodel = None
 srlnet = None
 factor = None
 whole_size_threshold = 3000  # R_max from the paper
-GPU_threshold = 1600 - 32 # Limit for the GPU (NVIDIA RTX 2080), can be adjusted 
+GPU_threshold = 1600 - 32  # Limit for the GPU (NVIDIA RTX 2080), can be adjusted
+
 
 # MAIN PART OF OUR METHOD
 def run(dataset, option):
-
     # Load merge network
     opt = TestOptions().parse()
     global pix2pixmodel
@@ -133,19 +134,19 @@ def run(dataset, option):
         # small high-density regions of the image.
         global factor
         factor = max(min(1, 4 * patch_scale * whole_image_optimal_size / whole_size_threshold), 0.2)
-        print('Adjust factor is:', 1/factor)
+        print('Adjust factor is:', 1 / factor)
 
         # Compute the target resolution.
         if img.shape[0] > img.shape[1]:
-            a = 2*whole_image_optimal_size
-            b = round(2*whole_image_optimal_size*img.shape[1]/img.shape[0])
+            a = 2 * whole_image_optimal_size
+            b = round(2 * whole_image_optimal_size * img.shape[1] / img.shape[0])
         else:
-            a = round(2*whole_image_optimal_size*img.shape[0]/img.shape[1])
-            b = 2*whole_image_optimal_size
+            a = round(2 * whole_image_optimal_size * img.shape[0] / img.shape[1])
+            b = 2 * whole_image_optimal_size
 
-        img = cv2.resize(img, (round(b/factor), round(a/factor)), interpolation=cv2.INTER_CUBIC)
+        img = cv2.resize(img, (int(round(b / factor)), int(round(a / factor))), interpolation=cv2.INTER_CUBIC)
 
-        base_size = option.net_receptive_field_size*2
+        base_size = option.net_receptive_field_size * 2
 
         # Extract selected patches for local refinement
         patchset = generatepatchs(img, base_size)
@@ -163,24 +164,25 @@ def run(dataset, option):
             mergein_scale = 1
 
         imageandpatchs = ImageandPatchs(option.data_dir, images.name, patchset, img, mergein_scale)
-        whole_estimate_resized = cv2.resize(whole_estimate, (round(img.shape[1]*mergein_scale),
-                                            round(img.shape[0]*mergein_scale)), interpolation=cv2.INTER_CUBIC)
+        whole_estimate_resized = cv2.resize(whole_estimate, (round(img.shape[1] * mergein_scale),
+                                                             round(img.shape[0] * mergein_scale)),
+                                            interpolation=cv2.INTER_CUBIC)
         imageandpatchs.set_base_estimate(whole_estimate_resized.copy())
         imageandpatchs.set_updated_estimate(whole_estimate_resized.copy())
 
         print('\t Resulted depthmap res will be :', whole_estimate_resized.shape[:2])
-        print('patchs to process: '+str(len(imageandpatchs)))
+        print('patchs to process: ' + str(len(imageandpatchs)))
 
         # Enumerate through all patches, generate their estimations and refining the base estimate.
         for patch_ind in range(len(imageandpatchs)):
-            
+
             # Get patch information
-            patch = imageandpatchs[patch_ind] # patch object
-            patch_rgb = patch['patch_rgb'] # rgb patch
-            patch_whole_estimate_base = patch['patch_whole_estimate_base'] # corresponding patch from base
-            rect = patch['rect'] # patch size and location
-            patch_id = patch['id'] # patch ID
-            org_size = patch_whole_estimate_base.shape # the original size from the unscaled input
+            patch = imageandpatchs[patch_ind]  # patch object
+            patch_rgb = patch['patch_rgb']  # rgb patch
+            patch_whole_estimate_base = patch['patch_whole_estimate_base']  # corresponding patch from base
+            rect = patch['rect']  # patch size and location
+            patch_id = patch['id']  # patch ID
+            org_size = patch_whole_estimate_base.shape  # the original size from the unscaled input
             print('\t processing patch', patch_ind, '|', rect)
 
             # We apply double estimation for patches. The high resolution value is fixed to twice the receptive
@@ -209,7 +211,7 @@ def run(dataset, option):
             visuals = pix2pixmodel.get_current_visuals()
 
             prediction_mapped = visuals['fake_B']
-            prediction_mapped = (prediction_mapped+1)/2
+            prediction_mapped = (prediction_mapped + 1) / 2
             prediction_mapped = prediction_mapped.squeeze().cpu().numpy()
 
             mapped = prediction_mapped
@@ -219,7 +221,7 @@ def run(dataset, option):
             p_coef = np.polyfit(mapped.reshape(-1), patch_whole_estimate_base.reshape(-1), deg=1)
             merged = np.polyval(p_coef, mapped.reshape(-1)).reshape(mapped.shape)
 
-            merged = cv2.resize(merged, (org_size[1],org_size[0]), interpolation=cv2.INTER_CUBIC)
+            merged = cv2.resize(merged, (org_size[1], org_size[0]), interpolation=cv2.INTER_CUBIC)
 
             # Get patch size and location
             w1 = rect[0]
@@ -230,7 +232,7 @@ def run(dataset, option):
             # To speed up the implementation, we only generate the Gaussian mask once with a sufficiently large size
             # and resize it to our needed size while merging the patches.
             if mask.shape != org_size:
-                mask = cv2.resize(mask_org, (org_size[1],org_size[0]), interpolation=cv2.INTER_LINEAR)
+                mask = cv2.resize(mask_org, (org_size[1], org_size[0]), interpolation=cv2.INTER_LINEAR)
 
             tobemergedto = imageandpatchs.estimation_updated_image
 
@@ -248,30 +250,30 @@ def run(dataset, option):
                                                (input_resolution[1], input_resolution[0]),
                                                interpolation=cv2.INTER_CUBIC), bits=2, colored=option.colorize_results)
         else:
-            midas.utils.write_depth(path, imageandpatchs.estimation_updated_image, bits=2, colored=option.colorize_results)
+            midas.utils.write_depth(path, imageandpatchs.estimation_updated_image, bits=2,
+                                    colored=option.colorize_results)
 
     print("finished")
 
 
 # Generating local patches to perform the local refinement described in section 6 of the main paper.
 def generatepatchs(img, base_size):
-    
     # Compute the gradients as a proxy of the contextual cues.
     img_gray = rgb2gray(img)
-    whole_grad = np.abs(cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=3)) +\
-        np.abs(cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=3))
+    whole_grad = np.abs(cv2.Sobel(img_gray, cv2.CV_64F, 0, 1, ksize=3)) + \
+                 np.abs(cv2.Sobel(img_gray, cv2.CV_64F, 1, 0, ksize=3))
 
     threshold = whole_grad[whole_grad > 0].mean()
     whole_grad[whole_grad < threshold] = 0
 
     # We use the integral image to speed-up the evaluation of the amount of gradients for each patch.
-    gf = whole_grad.sum()/len(whole_grad.reshape(-1))
+    gf = whole_grad.sum() / len(whole_grad.reshape(-1))
     grad_integral_image = cv2.integral(whole_grad)
 
     # Variables are selected such that the initial patch size would be the receptive field size
     # and the stride is set to 1/3 of the receptive field size.
-    blsize = int(round(base_size/2))
-    stride = int(round(blsize*0.75))
+    blsize = int(round(base_size / 2))
+    stride = int(round(blsize * 0.75))
 
     # Get initial Grid
     patch_bound_list = applyGridpatch(blsize, stride, img, [0, 0, 0, 0])
@@ -293,7 +295,7 @@ def adaptiveselection(integral_grad, patch_bound_list, gf):
     count = 0
     height, width = integral_grad.shape
 
-    search_step = int(32/factor)
+    search_step = int(32 / factor)
 
     # Go through all patches
     for c in range(len(patch_bound_list)):
@@ -301,7 +303,7 @@ def adaptiveselection(integral_grad, patch_bound_list, gf):
         bbox = patch_bound_list[str(c)]['rect']
 
         # Compute the amount of gradients present in the patch from the integral image.
-        cgf = getGF_fromintegral(integral_grad, bbox)/(bbox[2]*bbox[3])
+        cgf = getGF_fromintegral(integral_grad, bbox) / (bbox[2] * bbox[3])
 
         # Check if patching is beneficial by comparing the gradient density of the patch to
         # the gradient density of the whole image
@@ -313,8 +315,8 @@ def adaptiveselection(integral_grad, patch_bound_list, gf):
             # to the whole image gradient density
             while True:
 
-                bbox_test[0] = bbox_test[0] - int(search_step/2)
-                bbox_test[1] = bbox_test[1] - int(search_step/2)
+                bbox_test[0] = bbox_test[0] - int(search_step / 2)
+                bbox_test[1] = bbox_test[1] - int(search_step / 2)
 
                 bbox_test[2] = bbox_test[2] + search_step
                 bbox_test[3] = bbox_test[3] + search_step
@@ -325,7 +327,7 @@ def adaptiveselection(integral_grad, patch_bound_list, gf):
                     break
 
                 # Compare gradient density
-                cgf = getGF_fromintegral(integral_grad, bbox_test)/(bbox_test[2]*bbox_test[3])
+                cgf = getGF_fromintegral(integral_grad, bbox_test) / (bbox_test[2] * bbox_test[3])
                 if cgf < gf:
                     break
                 bbox = bbox_test.copy()
@@ -334,7 +336,7 @@ def adaptiveselection(integral_grad, patch_bound_list, gf):
             patchlist[str(count)]['rect'] = bbox
             patchlist[str(count)]['size'] = bbox[2]
             count = count + 1
-    
+
     # Return selected patches
     return patchlist
 
@@ -356,9 +358,9 @@ def doubleestimate(img, size1, size2, pix2pixsize, net_type):
     pix2pixmodel.test()
     visuals = pix2pixmodel.get_current_visuals()
     prediction_mapped = visuals['fake_B']
-    prediction_mapped = (prediction_mapped+1)/2
+    prediction_mapped = (prediction_mapped + 1) / 2
     prediction_mapped = (prediction_mapped - torch.min(prediction_mapped)) / (
-                torch.max(prediction_mapped) - torch.min(prediction_mapped))
+            torch.max(prediction_mapped) - torch.min(prediction_mapped))
     prediction_mapped = prediction_mapped.squeeze().cpu().numpy()
 
     return prediction_mapped
@@ -400,6 +402,7 @@ def estimatesrl(img, msize):
     depth_norm = cv2.resize(depth_norm, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_CUBIC)
 
     return depth_norm
+
 
 # Inference on MiDas-v2
 def estimatemidas(img, msize):
@@ -460,7 +463,7 @@ if __name__ == "__main__":
     parser.add_argument('--pix2pixsize', type=int, default=1024, required=False)  # Do not change it
     parser.add_argument('--depthNet', type=int, default=0, required=False,
                         help='use to select different base depth networks 0:midas 1:strurturedRL')
-    parser.add_argument('--colorize_results', action='store_true')
+    parser.add_argument('--colorize_results', default=True, action='store_true')
     parser.add_argument('--R0', action='store_true')
     parser.add_argument('--R20', action='store_true')
     parser.add_argument('--Final', action='store_true')
@@ -480,10 +483,10 @@ if __name__ == "__main__":
     # field size to speed up the local refinement as described in the section 6 of the main paper.
     if option_.depthNet == 0:
         option_.net_receptive_field_size = 384
-        option_.patch_netsize = 2*option_.net_receptive_field_size
+        option_.patch_netsize = 2 * option_.net_receptive_field_size
     elif option_.depthNet == 1:
         option_.net_receptive_field_size = 448
-        option_.patch_netsize = 2*option_.net_receptive_field_size
+        option_.patch_netsize = 2 * option_.net_receptive_field_size
     else:
         assert False, 'depthNet can only be 0,1'
 
